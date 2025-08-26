@@ -28,25 +28,33 @@ def index():
     if "messages" not in session:
         session["messages"] = []
 
+    error_msg = None
+
     if request.method == "POST":
         user_input = request.form.get("prompt")
         if user_input:
             messages = session["messages"]
             messages.append({"role": "user", "content": user_input})
-            session["messages"] = messages
 
             try:
                 response = qa_chain.invoke({"query": user_input})
-                messages.append({"role": "assistant", "content": response['result']})
-                session["messages"] = messages
+
+                # Safely get the result
+                answer = ""
+                if isinstance(response, dict):
+                    answer = response.get("result") or response.get("answer") or str(response)
+                else:
+                    answer = str(response)
+
+                messages.append({"role": "assistant", "content": answer})
             except Exception as e:
                 logger.error(f"Error while invoking QA chain: {e}", exc_info=True)
                 error_msg = f"Error: {str(e)}"
-                return render_template("index.html", messages=session["messages"], error=error_msg)
 
-        return redirect(url_for("index"))
+            session["messages"] = messages
+            return redirect(url_for("index"))
 
-    return render_template("index.html", messages=session.get("messages", []))
+    return render_template("index.html", messages=session.get("messages", []), error=error_msg)
 
 @app.route("/clear")
 def clear():
